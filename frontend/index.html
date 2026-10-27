@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DeepDive Agent — LangGraph Real-Time State Visualizer</title>
+  <meta name="description" content="Interactive real-time visualizer and debugger for the DeepDive multi-agent research LangGraph workflow.">
+  
+  <!-- Modern Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Marked.js for Markdown Rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-layout">
+
+    <!-- Header & Status Bar -->
+    <header class="header-bar">
+      <div class="brand-section">
+        <div class="brand-logo-icon">⚡</div>
+        <div class="brand-title">
+          <h1>DeepDive LangGraph Studio</h1>
+          <div class="brand-subtitle">Multi-Agent Research & Verification State Engine</div>
+        </div>
+      </div>
+      <div class="system-status-pills">
+        <div class="status-pill" id="pill-groq">
+          <span class="status-dot" id="dot-groq"></span> Groq Llama-3.3
+        </div>
+        <div class="status-pill" id="pill-gemini">
+          <span class="status-dot" id="dot-gemini"></span> Google Gemini
+        </div>
+        <div class="status-pill" id="pill-tavily">
+          <span class="status-dot" id="dot-tavily"></span> Tavily Search
+        </div>
+        <div class="status-pill" id="pill-state">
+          <span class="status-dot active"></span> <span id="lbl-status">Ready</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Top LangGraph Visualizer Pipeline -->
+    <section class="graph-visualizer-card" aria-label="LangGraph State Pipeline">
+      <div class="visualizer-header">
+        <div class="visualizer-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+          Active LangGraph Topology Execution
+        </div>
+        <div id="live-timer" style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted);">
+          Idle
+        </div>
+      </div>
+
+      <div class="pipeline-nodes-wrapper" id="pipeline-container">
+        <!-- Node: START -->
+        <div class="node-box" id="node-start">
+          <div class="node-circle">🏁</div>
+          <div class="node-label">START</div>
+          <div class="node-desc">Query Intake</div>
+        </div>
+
+        <div class="edge-connector" id="edge-start-planner"></div>
+
+        <!-- Node: PLANNER -->
+        <div class="node-box" id="node-planner">
+          <div class="node-circle">🧠</div>
+          <div class="node-label">Planner</div>
+          <div class="node-desc">Query Decomposition</div>
+        </div>
+
+        <div class="edge-connector" id="edge-planner-researcher"></div>
+
+        <!-- Node: RESEARCHER -->
+        <div class="node-box" id="node-researcher">
+          <div class="node-circle">🔍</div>
+          <div class="node-label">Researcher</div>
+          <div class="node-desc">Tavily & Firecrawl</div>
+        </div>
+
+        <div class="edge-connector" id="edge-researcher-verifier"></div>
+
+        <!-- Node: VERIFIER -->
+        <div class="node-box" id="node-verifier">
+          <div class="node-circle">⚖️</div>
+          <div class="node-label">Verifier</div>
+          <div class="node-desc">Rigor & Gaps Audit</div>
+        </div>
+
+        <div class="edge-connector" id="edge-verifier-synthesizer"></div>
+
+        <!-- Node: SYNTHESIZER -->
+        <div class="node-box" id="node-synthesizer">
+          <div class="node-circle">📝</div>
+          <div class="node-label">Synthesizer</div>
+          <div class="node-desc">Report Generation</div>
+        </div>
+
+        <div class="edge-connector" id="edge-synthesizer-end"></div>
+
+        <!-- Node: END -->
+        <div class="node-box" id="node-end">
+          <div class="node-circle">🎯</div>
+          <div class="node-label">END</div>
+          <div class="node-desc">State Finalized</div>
+        </div>
+
+      </div>
+
+      <!-- Dedicated Conditional Edge Return Lane (Positioned cleanly below nodes, no overlapping) -->
+      <div class="conditional-edge-lane" id="conditional-edge-lane">
+        <div class="conditional-edge-track idle" id="loop-indicator">
+          <div class="conditional-edge-line">
+            <span class="loop-return-arrow">⟵</span>
+          </div>
+          <div class="loop-badge">
+            <span class="loop-badge-icon">🔄</span>
+            <span class="loop-badge-label">Conditional Feedback Edge:</span>
+            <strong id="lbl-loop-count" class="loop-badge-count">Loop: 0 / 2</strong>
+            <span id="lbl-loop-status" class="loop-badge-status">Dormant</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Query Control Panel -->
+    <section class="control-card">
+      <div class="query-input-row">
+        <div class="input-group-main">
+          <svg class="input-search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input 
+            type="text" 
+            id="input-query" 
+            class="input-main" 
+            placeholder="Enter research prompt (e.g., 'What are the latest enterprise adoption trends for multi-agent LLMs in 2026?')" 
+            value="What are the latest enterprise adoption trends and architectural patterns for multi-agent LLM systems in 2026?"
+          >
+        </div>
+
+        <select id="select-model-provider" class="select-provider">
+          <option value="groq" selected>Groq (Llama-3.3-70b)</option>
+          <option value="gemini">Google Gemini Flash</option>
+          <option value="simulation">Fast Interactive Simulation</option>
+        </select>
+
+        <button id="btn-run" class="btn-primary">
+          <span id="btn-run-icon">▶</span>
+          <span id="btn-run-text">Run DeepDive</span>
+        </button>
+
+        <button id="btn-sample" class="btn-secondary" title="Immediately view completed research state">
+          <span>📂</span> Load Sample State
+        </button>
+      </div>
+
+      <div class="suggestions-row">
+        <span class="suggestion-label">Sample Inquiries:</span>
+        <button class="chip" data-query="What are the latest enterprise adoption trends and architectural patterns for multi-agent LLM systems in 2026?">
+          Enterprise Multi-Agent 2026
+        </button>
+        <button class="chip" data-query="What is Autonomous RAG and how does it compare to Modular and Adaptive RAG?">
+          Autonomous RAG vs. Adaptive
+        </button>
+        <button class="chip" data-query="How do verification loops in LangGraph reduce LLM hallucination rates in production?">
+          LangGraph Verification Loops
+        </button>
+        <button class="chip" data-query="What are the security vulnerabilities and prompt injection defenses for multi-agent workflows?">
+          Multi-Agent Security Defenses
+        </button>
+      </div>
+    </section>
+
+    <!-- State Inspector Multi-Tab Card -->
+    <main class="inspector-card">
+      <nav class="tab-nav-bar" role="tablist">
+        <button class="tab-btn active" data-tab="tab-overview" id="tab-btn-overview">
+          <span>📊</span> Overview & Metrics
+        </button>
+        <button class="tab-btn" data-tab="tab-questions" id="tab-btn-questions">
+          <span>❓</span> Sub-Questions <span class="tab-counter-badge" id="badge-subq-count">0</span>
+        </button>
+        <button class="tab-btn" data-tab="tab-evidence" id="tab-btn-evidence">
+          <span>📚</span> Evidence Bank <span class="tab-counter-badge" id="badge-evidence-count">0</span>
+        </button>
+        <button class="tab-btn" data-tab="tab-logs" id="tab-btn-logs">
+          <span>💻</span> Audit Logs Terminal <span class="tab-counter-badge" id="badge-logs-count">0</span>
+        </button>
+        <button class="tab-btn" data-tab="tab-report" id="tab-btn-report">
+          <span>📄</span> Final Research Report
+        </button>
+        <button class="tab-btn" data-tab="tab-json" id="tab-btn-json">
+          <span>🔍</span> Raw State JSON
+        </button>
+      </nav>
+
+      <div class="tab-content-area">
+        
+        <!-- Tab 1: Overview & Metrics -->
+        <div class="tab-pane active" id="tab-overview">
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <div class="metric-title">Sufficiency Status</div>
+              <div class="metric-value">
+                <span id="metric-sufficiency" class="metric-pill pending">Pending</span>
+              </div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-title">Research Loops</div>
+              <div class="metric-value" id="metric-loops">0 / 2</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-title">Sub-Questions</div>
+              <div class="metric-value" id="metric-subq-count">0</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-title">Evidence Collected</div>
+              <div class="metric-value" id="metric-evidence-count">0</div>
+            </div>
+          </div>
+
+          <div class="overview-summary-box">
+            <h3>Current State Breakdown</h3>
+            <p id="overview-query-label" style="color: var(--text-secondary); margin-bottom: 12px;">
+              <strong>Target Research Query:</strong> <span id="lbl-current-query" style="color: #fff;">None loaded.</span>
+            </p>
+            <div id="overview-flow-description" style="color: var(--text-muted); font-size: 0.9rem; line-height: 1.6;">
+              DeepDive executes a cyclical LangGraph state machine:
+              <strong>Planner</strong> breaks down your research inquiry into discrete sub-questions &rarr; 
+              <strong>Researcher</strong> scrapes and compiles empirical evidence &rarr; 
+              <strong>Verifier</strong> audits completeness; if gaps are found, it triggers a re-search loop &rarr; 
+              <strong>Synthesizer</strong> compiles a structured executive markdown brief with citation links.
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Sub-Questions -->
+        <div class="tab-pane" id="tab-questions">
+          <div class="questions-list" id="questions-container">
+            <div class="empty-state">
+              <div class="empty-icon">❓</div>
+              <div>No sub-questions generated yet. Run the agent to see the Planner in action.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 3: Evidence Bank -->
+        <div class="tab-pane" id="tab-evidence">
+          <div class="evidence-toolbar">
+            <input type="text" id="filter-evidence" class="evidence-search" placeholder="Filter evidence by keyword...">
+            <div style="font-size: 0.8rem; color: var(--text-muted);" id="evidence-summary-lbl">
+              Showing 0 items
+            </div>
+          </div>
+          <div class="evidence-grid" id="evidence-container">
+            <div class="empty-state" style="grid-column: 1 / -1;">
+              <div class="empty-icon">📚</div>
+              <div>No evidence chunks collected in state yet.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 4: Audit Logs Terminal -->
+        <div class="tab-pane" id="tab-logs">
+          <div class="terminal-window">
+            <div class="terminal-header">
+              <div class="terminal-dots">
+                <span class="terminal-dot red"></span>
+                <span class="terminal-dot yellow"></span>
+                <span class="terminal-dot green"></span>
+              </div>
+              <div class="terminal-title">deepdive-agent@langgraph: audit_logs</div>
+              <div class="terminal-actions">
+                <button class="btn-icon-sm" id="btn-copy-logs" title="Copy Logs">📋 Copy</button>
+                <button class="btn-icon-sm" id="btn-clear-logs" title="Clear Console">🧹 Clear</button>
+              </div>
+            </div>
+            <div class="terminal-body" id="terminal-logs">
+              <div class="log-line">
+                <span class="log-time">[00:00:00]</span>
+                <span class="log-msg system">System initialized. Awaiting research query execution...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 5: Final Report -->
+        <div class="tab-pane" id="tab-report">
+          <div class="report-view-container">
+            <div class="report-actions-bar">
+              <button class="btn-secondary" id="btn-copy-report">📋 Copy Markdown</button>
+              <button class="btn-secondary" id="btn-print-report">🖨️ Print / Save PDF</button>
+            </div>
+            <div id="report-rendered" class="markdown-rendered">
+              <div class="empty-state">
+                <div class="empty-icon">📄</div>
+                <div>The final report will be compiled here once the Synthesizer node completes.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 6: Raw State (JSON) -->
+        <div class="tab-pane" id="tab-json">
+          <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
+            <button class="btn-secondary" id="btn-copy-json">📋 Copy State JSON</button>
+          </div>
+          <pre class="json-viewer-box" id="json-viewer">{}</pre>
+        </div>
+
+      </div>
+    </main>
+
+  </div>
+
+  <!-- Main Application Script -->
+  <script src="app.js"></script>
+</body>
+</html>
